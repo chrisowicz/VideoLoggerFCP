@@ -1,0 +1,31 @@
+// Synthetic JSON5 fixture; no private media.
+{
+  "version": 2,
+  "mediaFileName": "Sample_A.MP4",
+  "cutSegments": [
+    {
+      "start": 1.25,
+      "end": 4.5,
+      "name": "Opening",
+      "selected": true
+    },
+    {
+      "start": 7,
+      "end": 12,
+      "name": "Interview",
+      "selected": true
+    },
+    {
+      "start": 20.25,
+      "end": 27.5,
+      "name": "Wide shot",
+      "selected": true
+    },
+    {
+      "start": 35,
+      "end": 42,
+      "name": "Closing",
+      "selected": true
+    }
+  ]
+}

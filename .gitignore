@@ -1,0 +1,40 @@
+# Swift/macOS build products
+.build/
+DerivedData/
+xcuserdata/
+*.app/
+dist/
+*.dSYM/
+*.swiftmodule
+# Keep shared SwiftPM configuration and Package.resolved; ignore only local state.
+.swiftpm/cache/
+.swiftpm/security/
+.swiftpm/xcode/xcuserdata/
+.swiftpm/xcode/package.xcworkspace/xcuserdata/
+# OS/editor/cache/temp files
+.DS_Store
+.cache/
+*.log
+*.tmp
+*.swp
+*~
+# Local data, output, credentials and agent instructions
+.local/
+local/
+Diagnostics/
+Exports/
+AGENTS.md
+**/AGENTS.md
+.agents/
+.codex/
+.env
+.env.*
+!.env.example
+# Never publish user media, private projects or generated FCP documents.
+*.[mM][pP]4
+*.[mM][oO][vV]
+*.[lL][lL][cC]
+*.[fF][cC][pP][xX][mM][lL]
+*.[fF][cC][pP][xX][mM][lL][dD]/
+# These small synthetic project fixtures are intentional test resources.
+!Tests/Fixtures/Projects/*.llc

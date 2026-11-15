@@ -18,15 +18,18 @@ public struct ConversionPlanner: Sendable {
         let eventName = options.eventName ?? project.sourceURL.deletingPathExtension().lastPathComponent
         try validateLabel(eventName, field: L("Event name"))
         guard !project.segments.isEmpty else { throw ConversionError(L("The project contains no segments.")) }
+        // LosslessCut sidecars can round the final time to six decimal places.
+        let endTolerance = media.usesTimingTolerance ? 0.000_000_501 : 1e-9
         let ranges = try project.segments.enumerated().map { index, segment in
             try validateLabel(segment.name, field: LF("Segment %1$@", String(describing: index + 1)))
             guard !segment.name.contains(","), segment.start.isFinite, segment.end.isFinite,
                   segment.start >= 0, segment.end > segment.start,
-                  segment.end <= media.durationSeconds + 1e-9 else {
+                  segment.end <= media.durationSeconds + endTolerance else {
                 throw ConversionError(LF("Segment %1$@ (%2$@): invalid range/name or end beyond the video (%3$@ s).", String(describing: index + 1), String(describing: segment.name), String(describing: media.durationSeconds)))
             }
             let start = try media.clock.nearestFrame(seconds: segment.start)
-            let end = try media.clock.nearestFrame(seconds: segment.end)
+            let alignedEnd = try media.clock.nearestFrame(seconds: segment.end)
+            let end = media.usesTimingTolerance ? min(alignedEnd, media.frameCount) : alignedEnd
             guard start < end, end <= media.frameCount else {
                 throw ConversionError(LF("Segment %1$@: the frame-aligned range is empty or outside the media.", String(describing: index + 1)))
             }

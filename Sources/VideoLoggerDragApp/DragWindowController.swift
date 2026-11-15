@@ -24,6 +24,7 @@ final class DragWindowController: NSWindowController, NSTableViewDataSource, NST
     private let dragView = SelectionDragView(frame: .zero)
     private var library = RecordingLibrary()
     private var roots: [String: URL] = [:]
+    private var sourceRows: [LibrarySegmentRow] = []
     private var rows: [LibrarySegmentRow] = []
     private let preparer = LibraryPreparer()
     private var prepared: PreparedLibraryDrag?
@@ -102,6 +103,9 @@ final class DragWindowController: NSWindowController, NSTableViewDataSource, NST
     private func makeTable(_ table: NSTableView, columns: [(String, String, Double)]) -> NSScrollView {
         for (id, title, width) in columns {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id)); column.title = title; column.width = width
+            if table === segmentsTable && (id == "source" || id == "name") {
+                column.sortDescriptorPrototype = NSSortDescriptor(key: id, ascending: true)
+            }
             table.addTableColumn(column)
         }
         table.dataSource = self; table.delegate = self; table.allowsMultipleSelection = true
@@ -222,10 +226,34 @@ final class DragWindowController: NSWindowController, NSTableViewDataSource, NST
     private func refreshRows() {
         invalidatePreparation()
         let ids = selectedRecordingIDs
-        rows = library.segmentRows(for: ids)
-        segmentsTable.reloadData(); segmentsTable.deselectAll(nil)
+        sourceRows = library.segmentRows(for: ids)
+        reloadSegmentRows(selecting: [])
         mediaButton.isEnabled = recordingsTable.selectedRowIndexes.count == 1 && !scanning
         removeButton.isEnabled = !selectedRecordingIDs.isEmpty
+    }
+    private var selectedSegmentIDs: Set<String> {
+        Set(segmentsTable.selectedRowIndexes.compactMap { rows.indices.contains($0) ? rows[$0].id : nil })
+    }
+    private func reloadSegmentRows(selecting ids: Set<String>) {
+        if let sort = segmentsTable.sortDescriptors.first {
+            let bySourceFile = sort.key == "source"
+            rows = sourceRows.sorted { lhs, rhs in
+                let left = bySourceFile ? lhs.recording.name : lhs.segment.name
+                let right = bySourceFile ? rhs.recording.name : rhs.segment.name
+                return left.localizedStandardCompare(right) == (sort.ascending ? .orderedAscending : .orderedDescending)
+            }
+        } else {
+            rows = sourceRows
+        }
+        updatingTables = true
+        segmentsTable.reloadData()
+        segmentsTable.selectRowIndexes(IndexSet(rows.indices.filter { ids.contains(rows[$0].id) }),
+                                       byExtendingSelection: false)
+        updatingTables = false
+    }
+    func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+        guard tableView === segmentsTable else { return }
+        reloadSegmentRows(selecting: selectedSegmentIDs)
     }
     private func invalidatePreparation() {
         prepareTask?.cancel(); selectionRevision = UUID(); prepared = nil; dragView.count = 0
@@ -234,7 +262,8 @@ final class DragWindowController: NSWindowController, NSTableViewDataSource, NST
     }
     private func prepareSelection() {
         invalidatePreparation()
-        let selected = segmentsTable.selectedRowIndexes.compactMap { rows.indices.contains($0) ? rows[$0] : nil }
+        let ids = selectedSegmentIDs
+        let selected = sourceRows.filter { ids.contains($0.id) }
         selectionLabel.stringValue = LF("Selected: %1$@", String(describing: selected.count))
         guard !scanning, !selected.isEmpty else { return }
         let revision = selectionRevision
@@ -251,6 +280,9 @@ final class DragWindowController: NSWindowController, NSTableViewDataSource, NST
                 guard let self, self.selectionRevision == revision else { return }
                 self.prepared = result; self.dragView.count = result.payload.count; self.spinner.stopAnimation(nil)
                 self.statusLabel.stringValue = LF("Ready — segments: %1$@. Drag the blue panel to an Event or Final Cut Pro timeline.", String(describing: result.payload.count))
+                if result.usesTimingTolerance {
+                    self.statusLabel.stringValue += " " + L("Minor frame-duration variations were accepted. Ranges are aligned to the Final Cut Pro frame grid. Check the cuts after import.")
+                }
             } catch {
                 guard !Task.isCancelled, let self, self.selectionRevision == revision else { return }
                 self.spinner.stopAnimation(nil); self.statusLabel.stringValue = error.localizedDescription

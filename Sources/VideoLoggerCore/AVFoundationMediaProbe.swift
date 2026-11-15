@@ -50,9 +50,7 @@ public struct AVFoundationMediaProbe: MediaProbing {
               let cursor = video.makeSampleCursor(presentationTimeStamp: .negativeInfinity) else {
             throw ConversionError(L("A video timeline starting at zero and AVFoundation sample access are required."))
         }
-        let firstDuration = cursor.currentSampleDuration
-        var timing = try CFRSampleValidator(frameDuration: firstDuration)
-        let clock = try FrameClock(numerator: firstDuration.value, denominator: firstDuration.timescale)
+        var timing = VideoSampleTiming()
         repeat {
             try Task.checkCancellation()
             try timing.append(presentationTime: cursor.presentationTimeStamp, duration: cursor.currentSampleDuration)
@@ -60,8 +58,21 @@ public struct AVFoundationMediaProbe: MediaProbing {
                 throw ConversionError(L("The video format changes within the recording."))
             }
         } while cursor.stepInPresentationOrder(byCount: 1) == 1
-        try timing.finish(trackDuration: timeRange.duration)
-        let sampleCount = timing.count, expectedPTS = timing.expectedPTS
+        let clock = try timing.finish(trackDuration: timeRange.duration)
+        let frameDuration = CMTime(value: clock.numerator, timescale: clock.denominator)
+        // Limit ranges to complete grid frames inside the real file duration.
+        var frameCount = timing.count
+        if timing.isVariable {
+            let editSegments = try await video.load(.segments)
+            guard editSegments.count == 1, let edit = editSegments.first, !edit.isEmpty,
+                  CMTimeRangeEqual(edit.timeMapping.source, timeRange),
+                  CMTimeRangeEqual(edit.timeMapping.target, timeRange) else {
+                throw ConversionError(L("The track duration does not match complete frames; unsupported edit list or corrupt video."))
+            }
+            let gridTicks = CMTimeConvertScale(timeRange.duration, timescale: clock.denominator, method: .roundTowardZero)
+            frameCount = gridTicks.value / clock.numerator
+            guard gridTicks.isNumeric, frameCount > 0 else { throw ConversionError(L("Invalid video frame duration.")) }
+        }
         let audioTracks = try await asset.loadTracks(withMediaType: .audio)
         guard audioTracks.count <= 1 else { throw ConversionError(L("At most one audio track is supported.")) }
         var audio: AudioMetadata?
@@ -87,11 +98,11 @@ public struct AVFoundationMediaProbe: MediaProbing {
             guard try await track.load(.canProvideSampleCursors),
                   let tc = track.makeSampleCursor(presentationTimeStamp: .negativeInfinity),
                   CMTimeCompare(tc.presentationTimeStamp, .zero) == 0,
-                  CMTimeCompare(tc.currentSampleDuration, expectedPTS) == 0 else {
+                  CMTimeCompare(tc.currentSampleDuration, timing.endPTS) == 0 else {
                 throw ConversionError(L("One continuous timecode sample covering the entire video is required."))
             }
             let tcDescription = tc.copyCurrentSampleFormatDescription()
-            guard CMTimeCompare(CMTimeCodeFormatDescriptionGetFrameDuration(tcDescription), firstDuration) == 0 else {
+            guard CMTimeCompare(CMTimeCodeFormatDescriptionGetFrameDuration(tcDescription), frameDuration) == 0 else {
                 throw ConversionError(L("The timecode frame rate differs from the video frame rate."))
             }
             guard Double(CMTimeCodeFormatDescriptionGetFrameQuanta(tcDescription)) == clock.framesPerSecond.rounded() else {
@@ -126,9 +137,10 @@ public struct AVFoundationMediaProbe: MediaProbing {
                 }
             }
         }
-        return MediaMetadata(url: url, width: width, height: height, clock: clock, frameCount: sampleCount,
+        return MediaMetadata(url: url, width: width, height: height, clock: clock, frameCount: frameCount,
                              audio: audio, colorSpace: colorSpace, sourceStartFrame: sourceStart,
-                             timecodeFormat: timecodeFormat, rotationDegrees: rotation)
+                             timecodeFormat: timecodeFormat, rotationDegrees: rotation,
+                             irregularSourceDuration: timing.isVariable ? timeRange.duration.seconds : nil)
     }
 
     static func decodeTimecode(_ data: Data, size: Int) throws -> Int64 {

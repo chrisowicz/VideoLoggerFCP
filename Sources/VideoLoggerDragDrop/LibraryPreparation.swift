@@ -42,6 +42,7 @@ public struct PreparationProgress: Sendable {
 
 public struct PreparedLibraryDrag: Sendable {
     public let payload: FCPXMLDragPayload
+    public let usesTimingTolerance: Bool
     let media: [URL: MediaFileStamp]
     let sources: [URL: Data]
     /// Called again at mouse-down/drag: never offer a stale selection after unmount or edits.
@@ -104,7 +105,9 @@ public actor LibraryPreparer {
             } else { grouped.append((row.source.id, document, [row.segment.sourceIndex])) }
         }
         let groups = grouped.map { DragClipSelection(document: $0.1, indices: $0.2) }
-        let prepared = PreparedLibraryDrag(payload: try FCPXMLDragPayload(selections: groups), media: mediaStamps, sources: sourceContents)
+        let prepared = PreparedLibraryDrag(payload: try FCPXMLDragPayload(selections: groups),
+                                           usesTimingTolerance: loaded.values.contains { $0.media.usesTimingTolerance },
+                                           media: mediaStamps, sources: sourceContents)
         try prepared.validateInputs()
         progress?(PreparationProgress(completed: total, total: total, name: ""))
         return prepared

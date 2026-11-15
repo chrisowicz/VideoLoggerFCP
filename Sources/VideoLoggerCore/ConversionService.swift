@@ -29,6 +29,9 @@ public struct ConversionService: Sendable {
         let sourceDirectory = source.deletingLastPathComponent().standardizedFileURL.resolvingSymlinksInPath()
         let mediaDirectory = metadata.url.deletingLastPathComponent().standardizedFileURL.resolvingSymlinksInPath()
         var warnings: [String] = []
+        if metadata.usesTimingTolerance {
+            warnings.append(L("Minor frame-duration variations were accepted. Ranges are aligned to the Final Cut Pro frame grid. Check the cuts after import."))
+        }
         if sourceDirectory != mediaDirectory {
             warnings.append(LF("LLC and media are in different folders. LLC: %1$@; media: %2$@. The default export location is the LLC folder.", String(describing: sourceDirectory.path), String(describing: mediaDirectory.path)))
         }

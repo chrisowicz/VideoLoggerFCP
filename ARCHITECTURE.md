@@ -19,11 +19,11 @@ VideoLoggerFCP is a Swift Package Manager project with no external packages. The
 
 Foundation's JSON5 decoder reads LLC version 2. Filenames and labels are validated, with explicit rejection of markers without an end and keyword labels containing commas. The latter cannot be preserved as one FCPXML keyword because commas are separators.
 
-AVFoundation reads actual sample duration/PTS, format descriptions, source timecode and orientation without transcoding. `CFRSampleValidator` compares every sample exactly using CMTime. VFR, gaps, format changes and unsupported edit lists fail instead of being converted to a nominal or average fps. CFR segment endpoints are rounded to the nearest source frame, up to half a frame per endpoint; ranges must remain valid and nonempty.
+AVFoundation reads actual sample duration/PTS, format descriptions, source timecode and orientation without transcoding. `VideoSampleTiming` checks continuous sample PTS using CMTime and calculates the dominant exact sample duration. A uniform source keeps its native clock. A source with uneven timing is eligible when at least 90% of samples share one duration and all durations are within ±10% of it. The planner aligns elapsed LLC times to that duration, with the asset capped at the last complete grid frame within the source. The app identifies this case in its readiness message. Larger variations and discontinuities fail validation.
 
 Source timecode is added to asset, clip and keyword starts. Stringout offsets remain relative to zero. Standard orientation is read from the original; no image rotation or second transform is inserted. The original media remains authoritative for pixels and audio.
 
-`SourceVideoValidation` permits supported H.264/HEVC SDR descriptions. It rejects HDR characteristics, HLG/PQ, Dolby Vision codec/atoms, HDR mastering/light metadata, Log and unsupported/incomplete color tags. Complete Rec.709 descriptions are declared in XML; absent tags remain unspecified. This is a conservative release limitation, not a claim that AVFoundation or Final Cut Pro cannot handle HDR.
+`SourceVideoValidation` checks the codec and recognizes complete Rec.709 and Rec.2020 SDR/HLG/PQ descriptions. Dolby Vision is represented through the compatible base color space and a reference to the untouched original, where dynamic metadata resides. If the tags do not describe a recognized space, the FCPXML format leaves color unspecified. No asset color override is written. AVFoundation decodability checks, detected Log rejection and exact timing validation still apply.
 
 `ConversionService` returns data and a plan; it never writes video or LLC. `SafeOutputWriter` writes only a new export, defaults beside LLC and refuses existing output/source/symlink overwrites.
 
@@ -31,7 +31,7 @@ Source timecode is added to asset, clip and keyword starts. Stringout offsets re
 
 `LibraryScanner` performs asynchronous filesystem/JSON work only. It discovers MP4/MOV and LLC recursively, pairs by `mediaFileName`, and keeps media without projects. It skips hidden files/packages and nested symlinks, reporting symlink skips; an explicitly chosen link resolves to its target. No original video bytes are read during scanning. FCPXML is previewed only when explicitly added, avoiding duplicate folder selections.
 
-`RecordingLibrary` holds recordings, project bytes and preview ranges in memory. Identity uses standardized, resolved full paths normalized to NFC. Display names are preserved. Duplicate basenames in different folders remain different recordings. Segments are ordered by recording list, then source time, sidecar path and source index.
+`RecordingLibrary` holds recordings, project bytes and preview ranges in memory. Identity uses standardized, resolved full paths normalized to NFC. Display names are preserved. Duplicate basenames in different folders remain different recordings. Drag preparation orders segments by recording list, then source time, sidecar path and source index. The Source File and Segment columns can sort the visible rows by localized name in either direction. Rows with the same sort value keep their source order. The controller restores selected row IDs after sorting.
 
 Removing entries stores excluded media/source IDs in memory. Refresh respects exclusions; explicit file/folder additions restore only their own scope. Clear cancels pending work and clears refresh roots. These operations do not mutate files. Relink associations are also session-only.
 
@@ -51,7 +51,7 @@ AppKit stays on MainActor. Scan/preparation jobs support cancellation and revisi
 
 ## Packaging
 
-`Resources/Info.plist`, the original icon and LICENSE are copied into a standalone x86_64 Release app by `Scripts/build-release.sh`. Runtime code depends only on system frameworks/libraries. Signing is ad-hoc, with no notarization. No App Sandbox/bookmarks, database, player, SwiftUI or persisted session is included.
+`Resources/Info.plist`, the original icon and LICENSE are copied into standalone arm64 or x86_64 Release apps by `Scripts/build-release.sh`. Runtime code depends only on system frameworks/libraries. Signing is ad-hoc, with no notarization. No App Sandbox/bookmarks, database, player, SwiftUI or persisted session is included.
 
 ## Localization
 

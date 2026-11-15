@@ -14,50 +14,96 @@ struct SourceVideoValidationTests {
         #expect(try SourceVideoValidation.colorSpace(codec: codec, extensions: rec709 as NSDictionary, containsHDR: false) == "1-1-1 (Rec. 709)")
         #expect(try SourceVideoValidation.colorSpace(codec: codec, extensions: [:], containsHDR: false) == nil)
     }
-    @Test
-    func hdrDolbyVisionLogAndAmbiguousColorAreBlocked() throws {
-        var cases: [[String: Any]] = []
-        for transfer in [kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG, kCMFormatDescriptionTransferFunction_SMPTE_ST_2084_PQ] {
-            var tags = rec709; tags[kCMFormatDescriptionExtension_TransferFunction as String] = transfer; cases.append(tags)
-        }
-        for key in [kCMFormatDescriptionExtension_MasteringDisplayColorVolume, kCMFormatDescriptionExtension_ContentLightLevelInfo,
-                    kCMFormatDescriptionExtension_AlternativeTransferCharacteristics, kCMFormatDescriptionExtension_LogTransferFunction] {
-            var tags = rec709; tags[key as String] = Data([0]); cases.append(tags)
-        }
-        for atom in ["dvcC", "dvvC"] {
-            var tags = rec709; tags[kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms as String] = [atom: Data([1])]; cases.append(tags)
-        }
-        cases.append([kCMFormatDescriptionExtension_ColorPrimaries as String: "ITU_R_2020"])
-        for tags in cases {
-            #expect(throws: ConversionError.self) { try SourceVideoValidation.colorSpace(codec: kCMVideoCodecType_HEVC, extensions: tags as NSDictionary, containsHDR: false) }
-        }
-        for codec in [kCMVideoCodecType_DolbyVisionHEVC, FourCharCode(0x64766865)] {
-            #expect(throws: ConversionError.self) { try SourceVideoValidation.colorSpace(codec: codec, extensions: rec709 as NSDictionary, containsHDR: false) }
-        }
-        #expect(throws: ConversionError.self) { try SourceVideoValidation.colorSpace(codec: kCMVideoCodecType_HEVC, extensions: rec709 as NSDictionary, containsHDR: true) }
-        #expect(throws: ConversionError.self) { try SourceVideoValidation.colorSpace(codec: kCMVideoCodecType_AppleProRes422, extensions: rec709 as NSDictionary, containsHDR: false) }
+    @Test(arguments: [
+        ("ITU_R_2100_HLG", "9-18-9 (Rec. 2020 HLG)"),
+        ("SMPTE_ST_2084_PQ", "9-16-9 (Rec. 2020 PQ)"),
+        ("ITU_R_709_2", "9-1-9 (Rec. 2020)")
+    ])
+    func recognizedRec2020ProfilesKeepTheirTags(transfer: String, expected: String) throws {
+        let tags = [kCMFormatDescriptionExtension_ColorPrimaries as String: "ITU_R_2020",
+                    kCMFormatDescriptionExtension_TransferFunction as String: transfer,
+                    kCMFormatDescriptionExtension_YCbCrMatrix as String: "ITU_R_2020"]
+        #expect(try SourceVideoValidation.colorSpace(codec: kCMVideoCodecType_HEVC, extensions: tags as NSDictionary,
+                                                    containsHDR: transfer != "ITU_R_709_2") == expected)
     }
+
+    @Test
+    func dolbyVisionHLGKeepsTheBaseSpaceAndAmbiguousTagsDeferToTheOriginal() throws {
+        var hlg: [String: Any] = [kCMFormatDescriptionExtension_ColorPrimaries as String: "ITU_R_2020",
+                    kCMFormatDescriptionExtension_TransferFunction as String: "ITU_R_2100_HLG",
+                    kCMFormatDescriptionExtension_YCbCrMatrix as String: "ITU_R_2020"]
+        hlg[kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms as String] = ["dvvC": Data([1])]
+        for codec in [kCMVideoCodecType_HEVC, kCMVideoCodecType_DolbyVisionHEVC, FourCharCode(0x64766865)] {
+            #expect(try SourceVideoValidation.colorSpace(codec: codec, extensions: hlg as NSDictionary,
+                                                        containsHDR: true) == "9-18-9 (Rec. 2020 HLG)")
+        }
+        let incomplete = [kCMFormatDescriptionExtension_ColorPrimaries as String: "ITU_R_2020"]
+        var p3 = rec709
+        p3[kCMFormatDescriptionExtension_ColorPrimaries as String] = "P3_D65"
+        for tags in [incomplete, p3] {
+            #expect(try SourceVideoValidation.colorSpace(codec: kCMVideoCodecType_HEVC, extensions: tags as NSDictionary,
+                                                        containsHDR: false) == nil)
+        }
+        #expect(try SourceVideoValidation.colorSpace(codec: kCMVideoCodecType_HEVC, extensions: rec709 as NSDictionary,
+                                                    containsHDR: true) == nil)
+        #expect(try SourceVideoValidation.colorSpace(codec: kCMVideoCodecType_DolbyVisionHEVC, extensions: rec709 as NSDictionary,
+                                                    containsHDR: false) == nil)
+    }
+
+    @Test
+    func logAndUnsupportedCodecsRemainBlocked() {
+        var log = rec709
+        log[kCMFormatDescriptionExtension_LogTransferFunction as String] = "AppleLog"
+        #expect(throws: ConversionError.self) {
+            try SourceVideoValidation.colorSpace(codec: kCMVideoCodecType_HEVC, extensions: log as NSDictionary, containsHDR: false)
+        }
+        #expect(throws: ConversionError.self) {
+            try SourceVideoValidation.colorSpace(codec: kCMVideoCodecType_AppleProRes422, extensions: rec709 as NSDictionary, containsHDR: false)
+        }
+    }
+
     @Test(arguments: [24, 25, 30, 50, 60, 120])
-    func cfrRequiresEveryExactPTSAndDuration(fps: Int32) throws {
+    func constantRatesRemainExact(fps: Int32) throws {
+        var timing = VideoSampleTiming()
         let duration = CMTime(value: 1, timescale: fps)
-        var timing = try CFRSampleValidator(frameDuration: duration)
         for frame in 0..<5 { try timing.append(presentationTime: CMTime(value: Int64(frame), timescale: fps), duration: duration) }
-        try timing.finish(trackDuration: CMTime(value: 5, timescale: fps))
-        #expect(timing.count == 5)
-        #expect(throws: ConversionError.self) { try timing.append(presentationTime: CMTime(value: 5, timescale: fps), duration: CMTime(value: 2, timescale: fps)) }
+        #expect(try timing.finish(trackDuration: CMTime(value: 5, timescale: fps)) == FrameClock(numerator: 1, denominator: fps))
+        #expect(!timing.isVariable)
         #expect(throws: ConversionError.self) { try timing.append(presentationTime: CMTime(value: 6, timescale: fps), duration: duration) }
     }
+
     @Test
     func fractionalCFRAndMalformedTimesAreCheckedExactly() throws {
         let duration = CMTime(value: 1001, timescale: 30000)
-        var timing = try CFRSampleValidator(frameDuration: duration)
+        var timing = VideoSampleTiming()
         try timing.append(presentationTime: .zero, duration: duration)
-        try timing.finish(trackDuration: duration)
-        #expect(throws: ConversionError.self) { try timing.append(presentationTime: CMTime(value: 1, timescale: 30), duration: duration) }
+        #expect(try timing.finish(trackDuration: duration) == FrameClock(numerator: 1001, denominator: 30000))
         #expect(throws: ConversionError.self) { try timing.finish(trackDuration: CMTime(value: 1, timescale: 30)) }
         #expect(throws: ConversionError.self) { try timing.append(presentationTime: .invalid, duration: duration) }
-        #expect(throws: ConversionError.self) { try CFRSampleValidator(frameDuration: .zero) }
+        #expect(throws: ConversionError.self) { try timing.append(presentationTime: duration, duration: .zero) }
     }
+
+    @Test
+    func minorUnevenDurationsUseDominantCadenceWithoutFirstSampleBias() throws {
+        var timing = VideoSampleTiming()
+        for ticks in [11, 9] + Array(repeating: 10, count: 18) {
+            try timing.append(presentationTime: timing.endPTS, duration: CMTime(value: Int64(ticks), timescale: 600))
+        }
+        #expect(try timing.finish(trackDuration: CMTime(value: 200, timescale: 600)) == FrameClock(numerator: 1, denominator: 60))
+        #expect(timing.isVariable)
+    }
+
+    @Test
+    func mixedRatesAndLongSamplesStayBlocked() throws {
+        for values in [[25] + Array(repeating: 20, count: 99), [21, 21] + Array(repeating: 20, count: 8)] {
+            var timing = VideoSampleTiming()
+            for ticks in values {
+                try timing.append(presentationTime: timing.endPTS, duration: CMTime(value: Int64(ticks), timescale: 600))
+            }
+            #expect(throws: ConversionError.self) { try timing.finish(trackDuration: timing.endPTS) }
+        }
+    }
+
     @Test(arguments: [0, 90, 180, 270])
     func allStandardRotationsAreRecognized(rotation: Int) throws {
         let transforms = [0: CGAffineTransform.identity, 90: CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: 48, ty: 0),

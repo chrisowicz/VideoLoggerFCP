@@ -26,8 +26,8 @@ public struct LoggingProject: Sendable {
     }
 }
 
-/// Exact seconds per frame, never an approximation of nominalFrameRate.
-public struct FrameClock: Equatable, Sendable {
+/// Rational seconds per frame on the FCPXML grid.
+public struct FrameClock: Hashable, Sendable {
     public let numerator: Int64
     public let denominator: Int32
     public init(numerator: Int64, denominator: Int32) throws {
@@ -74,15 +74,20 @@ public struct MediaMetadata: Sendable {
     public let sourceStartFrame: Int64
     public let timecodeFormat: String
     public let rotationDegrees: Int
+    /// Actual source duration when uneven samples required a regular export grid.
+    public let irregularSourceDuration: Double?
+    public var usesTimingTolerance: Bool { irregularSourceDuration != nil }
     public init(url: URL, width: Int, height: Int, clock: FrameClock, frameCount: Int64,
                 audio: AudioMetadata? = nil, colorSpace: String? = nil,
-                sourceStartFrame: Int64 = 0, timecodeFormat: String = "NDF", rotationDegrees: Int = 0) {
+                sourceStartFrame: Int64 = 0, timecodeFormat: String = "NDF", rotationDegrees: Int = 0,
+                irregularSourceDuration: Double? = nil) {
         self.url = url; self.width = width; self.height = height; self.clock = clock
         self.frameCount = frameCount; self.audio = audio; self.colorSpace = colorSpace
         self.sourceStartFrame = sourceStartFrame; self.timecodeFormat = timecodeFormat
         self.rotationDegrees = rotationDegrees
+        self.irregularSourceDuration = irregularSourceDuration
     }
-    public var durationSeconds: Double { Double(frameCount) * clock.secondsPerFrame }
+    public var durationSeconds: Double { irregularSourceDuration ?? Double(frameCount) * clock.secondsPerFrame }
 }
 
 public struct ExportOptions: Sendable {

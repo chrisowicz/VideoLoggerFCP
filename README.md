@@ -30,9 +30,9 @@ LosslessCut is useful for reviewing long recordings and naming useful ranges. Vi
 
 ## Supported media and limits
 
-MP4 and MOV with H.264 or HEVC/H.265, subject to AVFoundation support on the current computer. The engine validates every video presentation timestamp and frame duration. It supports CFR, standard 0/90/180/270° rotation, square pixels and a single supported mono/stereo audio track.
+MP4 and MOV with H.264 or HEVC/H.265, subject to AVFoundation support on the current computer. The engine validates every video presentation timestamp and frame duration. It supports CFR, small frame-duration variations, standard 0/90/180/270° rotation, square pixels and a single supported mono/stereo audio track.
 
-**VFR and irregular timing are rejected. HDR/Dolby Vision, Log and unsupported or incomplete color tags are rejected.** The application never converts HDR to SDR or approximates VFR timing. Rec.709 tags are preserved; completely absent tags are left unspecified. Untagged files are not proof of SDR. See [requirements](REQUIREMENTS.md) and [testing limits](docs/TESTING.md).
+**The app accepts small timing variations in continuous clips.** It aligns ranges to the dominant frame grid and displays a notice. Larger VFR changes, gaps and explicitly flagged Log remain blocked. VideoLoggerFCP describes recognized Rec.709 and Rec.2020 SDR/HLG/PQ source color spaces, including the HLG base layer of compatible Dolby Vision media. For incomplete or unrecognized color metadata, it omits the color-space declaration so Final Cut Pro can inspect the original file. VideoLoggerFCP references the original recording without transcoding or forcing a color override. See [requirements](REQUIREMENTS.md) and [testing limits](docs/TESTING.md).
 
 There is no claim of full iPhone HDR/VFR compatibility. Real iPhone footage and Final Cut Pro playback need manual verification. JPEG, PNG and other still images are not supported as source media.
 
@@ -43,7 +43,7 @@ There is no claim of full iPhone HDR/VFR compatibility. Real iPhone footage and 
 - Swift 6 / Command Line Tools for building (validated with Swift 6.1.2).
 - Original recordings accessible at their existing locations, including external disks.
 
-The included build procedure targets Intel. Apple Silicon distribution is not validated in this release.
+The build script produces separate packages for Intel (x86_64) and Apple Silicon (arm64). The current builds were checked on Apple Silicon with macOS 26.7.3.
 
 ## Download and install
 
@@ -56,11 +56,11 @@ The application is ad-hoc signed and **not notarized**. A downloaded copy may tr
 ## Build from source
 
 ```sh
-sh Scripts/build-release.sh
-open dist/VideoLoggerFCP.app
+sh Scripts/build-release.sh arm64
+sh Scripts/build-release.sh x86_64
 ```
 
-The result is a standalone Release bundle at `dist/VideoLoggerFCP.app`. Copy it to `/Applications` in Finder and open it normally; daily use does not require Terminal. The app does not depend on the build directory after packaging.
+The standalone Release bundles are `dist/Apple-Silicon/VideoLoggerFCP.app` and `dist/Intel/VideoLoggerFCP.app`. Copy the one for your Mac to `/Applications` in Finder.
 
 This build uses an ad-hoc signature. It is **not notarized** and is not signed with a paid Apple Developer identity. Downloaded copies may be blocked by Gatekeeper; follow Apple's supported opening procedure only after verifying the source. See [build and installation](docs/BUILDING.md).
 
@@ -74,7 +74,7 @@ To choose a language for this app only, open **System Settings → General → L
 ## Use
 
 1. Drop LLC/MP4/MOV files or folders from Finder into the window, or choose **Add Files or Folders…**.
-2. Select recordings on the left, then segments on the right with Command/Shift-click.
+2. Select recordings on the left, then segments on the right with Command/Shift-click. Click **Source File** or **Segment** to sort by that column. Click the active header again to reverse the order. Your selection and the source order used in the drag stay the same.
 3. Wait for **Ready**. Media metadata is inspected only for selected sources.
 4. Drag the drag panel beneath the tables to an existing Event or open Final Cut Pro timeline.
 5. Reuse the selection in another project. Choose **Leave files in place** in Final Cut Pro and verify the original media references.

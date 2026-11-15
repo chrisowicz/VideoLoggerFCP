@@ -5,13 +5,24 @@ cd "$project_directory"
 if [ -L "$project_directory/dist" ] || [ -L "$project_directory/.build" ]; then
     echo 'Refusing symbolic links for build/output directories.' >&2; exit 1
 fi
-swift build --configuration release --arch x86_64 --product videologger-drag
-binary_directory=$(swift build --configuration release --arch x86_64 --show-bin-path)
+architecture=${1:-x86_64}
+target_parent="$project_directory/dist"
+case "$architecture" in
+    x86_64) [ "$#" -eq 0 ] || target_parent="$project_directory/dist/Intel" ;;
+    arm64) target_parent="$project_directory/dist/Apple-Silicon" ;;
+    *) echo 'Usage: build-release.sh [x86_64|arm64]' >&2; exit 2 ;;
+esac
+[ "$#" -le 1 ] || { echo 'Usage: build-release.sh [x86_64|arm64]' >&2; exit 2; }
+[ ! -L "$target_parent" ] || { echo 'Refusing a symbolic link for the output directory.' >&2; exit 1; }
+build_directory="$project_directory/.build/release-$architecture"
+swift build --scratch-path "$build_directory" --configuration release --arch "$architecture" --product videologger-drag
+binary_directory=$(swift build --scratch-path "$build_directory" --configuration release --arch "$architecture" --show-bin-path)
 staging_directory=$(mktemp -d "$project_directory/.build/release-bundle.XXXXXX")
 trap 'rm -rf "$staging_directory"' EXIT HUP INT TERM
 app_directory="$staging_directory/VideoLoggerFCP.app"
-mkdir -p "$app_directory/Contents/MacOS" "$app_directory/Contents/Resources" "$project_directory/dist"
+mkdir -p "$app_directory/Contents/MacOS" "$app_directory/Contents/Resources" "$target_parent"
 /usr/bin/install -m 755 "$binary_directory/videologger-drag" "$app_directory/Contents/MacOS/VideoLoggerFCP"
+[ "$(/usr/bin/lipo -archs "$app_directory/Contents/MacOS/VideoLoggerFCP")" = "$architecture" ]
 /usr/bin/strip -S "$app_directory/Contents/MacOS/VideoLoggerFCP"
 /usr/bin/install -m 644 Resources/Info.plist "$app_directory/Contents/Info.plist"
 /usr/bin/install -m 644 Resources/AppIcon.icns "$app_directory/Contents/Resources/AppIcon.icns"
@@ -26,7 +37,7 @@ done
 /usr/bin/plutil -lint "$app_directory/Contents/Info.plist"
 /usr/bin/codesign --force --sign - --timestamp=none "$app_directory"
 /usr/bin/codesign --verify --deep --strict "$app_directory"
-target_directory="$project_directory/dist/VideoLoggerFCP.app"
+target_directory="$target_parent/VideoLoggerFCP.app"
 if [ -L "$target_directory" ]; then
     echo 'Refusing to replace a symbolic link at the output path.' >&2; exit 1
 fi

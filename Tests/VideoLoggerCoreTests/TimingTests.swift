@@ -5,6 +5,24 @@ import CoreGraphics
 
 struct TimingTests {
     @Test
+    func toleratedTimingUsesWallTimeAndHandlesRoundedEndOfFile() throws {
+        let source = URL(fileURLWithPath: "/example/phone.llc")
+        let media = MediaMetadata(url: URL(fileURLWithPath: "/example/phone.mov"),
+                                  width: 1920, height: 1080, clock: try FrameClock(numerator: 1, denominator: 60),
+                                  frameCount: 1366, irregularSourceDuration: 22.781666666666666)
+        let project = LoggingProject(sourceURL: source, mediaFileName: "phone.mov",
+            segments: [LogSegment(start: 9.581892, end: 22.781667, name: "Selection")])
+        let plan = try ConversionPlanner().plan(project: project, media: media, options: ExportOptions())
+        #expect(plan.ranges[0].start == 575)
+        #expect(plan.ranges[0].end == 1366)
+        let bad = LoggingProject(sourceURL: source, mediaFileName: "phone.mov",
+            segments: [LogSegment(start: 0, end: 22.782, name: "Beyond media")])
+        #expect(throws: ConversionError.self) {
+            try ConversionPlanner().plan(project: bad, media: media, options: ExportOptions())
+        }
+    }
+
+    @Test
     func testIntegerAndFractionalFrameClocks() throws {
         let pal = try FrameClock(numerator: 1, denominator: 25)
         #expect(try pal.nearestFrame(seconds: 1) == 25)

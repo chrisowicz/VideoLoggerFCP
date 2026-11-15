@@ -142,6 +142,25 @@ struct DragDropTests {
         }
     }
 
+    @Test(arguments: ["9-18-9 (Rec. 2020 HLG)", "9-16-9 (Rec. 2020 PQ)", nil] as [String?])
+    func sourceColorReachesExportAndDragWithoutAnAssetOverride(colorSpace: String?) throws {
+        let (data, media) = try base(stringout: true, colorSpace: colorSpace)
+        let document = try DragDocumentReader.read(data, source: repository, media: media)
+        let payload = try document.payload(for: [0])
+        for representation in [data, try #require(payload.data(for: FCPXMLDragPayload.currentType)),
+                               try #require(payload.data(for: FCPXMLDragPayload.legacyType))] {
+            let xml = try XMLDocument(data: representation)
+            #expect(try xml.nodes(forXPath: "//format/@colorSpace").map(\.stringValue) == (colorSpace.map { [$0] } ?? []))
+            #expect(try xml.nodes(forXPath: "//asset/@colorSpaceOverride").isEmpty)
+            #expect(try xml.nodes(forXPath: "//media-rep/@src").first?.stringValue == media.url.absoluteString)
+        }
+        if FileManager.default.fileExists(atPath: dtdDirectory.appendingPathComponent("FCPXMLv1_14.dtd").path) {
+            try validate(data, version: "1_9")
+            try validate(#require(payload.data(for: FCPXMLDragPayload.currentType)), version: "1_14")
+            try validate(#require(payload.data(for: FCPXMLDragPayload.legacyType)), version: "1_9")
+        }
+    }
+
     @Test
     func loaderReusesEngineForLLCAndReadsExistingFCPXML() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -183,10 +202,10 @@ struct DragDropTests {
             == xml.payload(for: [0]).data(for: FCPXMLDragPayload.currentType))
     }
 
-    private func base(stringout: Bool = false) throws -> (Data, MediaMetadata) {
+    private func base(stringout: Bool = false, colorSpace: String? = "1-1-1 (Rec. 709)") throws -> (Data, MediaMetadata) {
         let source = try FixtureResources.project("four-segments")
         let project = try LosslessCutImporter().parse(Data(contentsOf: source), sourceURL: source)
-        let media = try testMedia(url: URL(fileURLWithPath: "/originals/Zażółć & film #1.MP4"))
+        let media = try testMedia(url: URL(fileURLWithPath: "/originals/Zażółć & film #1.MP4"), colorSpace: colorSpace)
         let plan = try ConversionPlanner().plan(project: project, media: media, options: ExportOptions(includeStringout: stringout))
         return (try FCPXMLExporter().export(plan), media)
     }
@@ -211,8 +230,8 @@ private struct StubProbe: MediaProbing {
         return try testMedia(url: url)
     }
 }
-private func testMedia(url: URL) throws -> MediaMetadata {
+private func testMedia(url: URL, colorSpace: String? = "1-1-1 (Rec. 709)") throws -> MediaMetadata {
     MediaMetadata(url: url, width: 3840, height: 3840, clock: try FrameClock(numerator: 1001, denominator: 30000), frameCount: 26361,
-                  audio: AudioMetadata(channels: 2, sampleRate: 48000), colorSpace: "1-1-1 (Rec. 709)",
+                  audio: AudioMetadata(channels: 2, sampleRate: 48000), colorSpace: colorSpace,
                   sourceStartFrame: 2457699, timecodeFormat: "DF", rotationDegrees: 90)
 }

@@ -49,7 +49,6 @@
 "Files and folders → recordings → segments → drag the blue panel to Final Cut Pro" = "Foldery i pliki z Findera → wybór nagrań → wybór segmentów → panel przeciągania do FCP";
 "Filter changed. Select segments again; hidden recordings are not included in a drag." = "Zmieniono filtr. Wybierz segmenty ponownie; ukryte nagrania nie są przeciągane.";
 "Final Cut Pro import requires separate verification; see docs/USAGE.md." = "Import do Final Cut Pro wymaga osobnej weryfikacji; instrukcja: docs/FCP_IMPORT.md.";
-"HDR / Dolby Vision: this variant cannot be mapped safely. Export and Drag & Drop are blocked; the original remains unchanged, without SDR conversion." = "HDR / Dolby Vision: ten wariant nie jest bezpiecznie obsługiwany przez konwerter. Eksport i Drag & Drop zablokowano; oryginał pozostaje bez zmian, bez konwersji do SDR.";
 "Inconsistent segment list. Refresh the sources." = "Niespójna lista segmentów. Odśwież źródła.";
 "Interlaced video is not supported." = "MVP nie obsługuje wideo z przeplotem.";
 "Invalid FCPXML range." = "Nieprawidłowy zakres FCPXML.";
@@ -148,14 +147,15 @@
 "The timecode frame rate differs from the video frame rate." = "Klatkaż timecode różni się od klatkażu obrazu.";
 "The track duration does not match complete frames; unsupported edit list or corrupt video." = "Czas ścieżki nie odpowiada pełnym klatkom; nieobsługiwana lista edycji lub uszkodzone wideo.";
 "The video format changes within the recording." = "Format wideo zmienia się wewnątrz materiału.";
-"The video has a variable frame rate (VFR), gaps or irregular PTS. Segments cannot be mapped exactly by the CFR engine. Export and Drag & Drop are blocked without approximating timing." = "Wideo ma zmienny klatkaż (VFR), przerwy lub nieregularne PTS. Nie można dokładnie odwzorować segmentów w silniku CFR. Eksport i Drag & Drop zablokowano bez przybliżania czasów.";
+"Invalid video timestamps or a gap in the presentation timeline. Export and Drag & Drop are blocked." = "Nieprawidłowe znaczniki czasu lub przerwa w ścieżce wideo. Eksport i Drag & Drop zablokowano.";
+"VFR exceeds the timing tolerance. Export and Drag & Drop are blocked." = "Zmiany klatkażu VFR przekraczają tolerancję. Eksport i Drag & Drop zablokowano.";
+"Minor frame-duration variations were accepted. Ranges are aligned to the Final Cut Pro frame grid. Check the cuts after import." = "Zaakceptowano niewielkie różnice w długości klatek. Zakresy dopasowano do siatki klatek Final Cut Pro. Sprawdź cięcia po imporcie.";
 "Two versions of the same source are present in one selection." = "Dwie wersje tego samego źródła w jednej selekcji.";
 "Unknown option or missing value: %1$@" = "Nieznana opcja lub brak wartości: %1$@";
 "Unsupported .llc version: %1$@. Version 2 is supported." = "Nieobsługiwana wersja .llc: %1$@. MVP obsługuje wersję 2.";
 "Unsupported drop-frame timecode rate." = "Nieobsługiwany klatkaż drop-frame timecode.";
-"Unsupported or incomplete color metadata (SDR Rec.709 or no tags required). Export and Drag & Drop are blocked; colors are not converted." = "Nieobsługiwane lub niepełne metadane kolorystyczne (wymagane SDR Rec.709 albo brak tagów). Eksport i Drag & Drop zablokowano; kolory nie są przeliczane.";
 "Unsupported timecode format." = "Nieobsługiwany format timecode.";
-"Unsupported video codec. H.264 and HEVC/H.265 in MP4 or MOV are supported (SDR, CFR)." = "Nieobsługiwany kodek wideo. Obsługiwane są H.264 i HEVC/H.265 w MP4 lub MOV (SDR, CFR).";
+"Unsupported video codec. H.264 and HEVC/H.265 in MP4 or MOV are supported (CFR)." = "Nieobsługiwany kodek wideo. Obsługiwane są H.264 i HEVC/H.265 w MP4 lub MOV (CFR).";
 "Video: %1$@×%2$@, %3$@ fps, frame duration %4$@, %5$@ frames" = "Wideo: %1$@×%2$@, %3$@ fps, czas klatki %4$@, %5$@ klatek";
 "VideoLoggerFCP · %1$@ segments" = "VideoLoggerFCP · %1$@ fragmentów";
 "VideoLoggerFCP — Recordings and Segments" = "VideoLoggerFCP — Nagrania i segmenty";

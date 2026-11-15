@@ -1,16 +1,16 @@
 # Building and installing
 
-Use macOS 15+ on Intel with Swift 6 Command Line Tools (validated with Swift 6.1.2). No Xcode project, downloaded package or Apple Developer Program membership is required.
+Use macOS 15+ on Intel or Apple Silicon with Swift 6 Command Line Tools. No Xcode project, downloaded package or Apple Developer Program membership is required.
 
 ```sh
 swift test --disable-xctest
-sh Scripts/build-release.sh
-open dist/VideoLoggerFCP.app
+sh Scripts/build-release.sh arm64
+sh Scripts/build-release.sh x86_64
 ```
 
-The script builds `videologger-drag` in Release for x86_64, assembles `VideoLoggerFCP.app`, copies the icon/license, validates Info.plist and applies/verifies an ad-hoc signature. It replaces only an existing output app with the expected bundle identifier and refuses a symlink at that output path. The compatibility entry point `Scripts/build-drag-app.sh` calls the same build.
+The outputs are `dist/Apple-Silicon/VideoLoggerFCP.app` (arm64) and `dist/Intel/VideoLoggerFCP.app` (x86_64). Each bundle includes its icon, license, Polish and English resources, and a verified ad-hoc signature. Running the script without an argument retains the Intel output at `dist/VideoLoggerFCP.app` for the legacy build and ZIP scripts.
 
-The entire `dist/VideoLoggerFCP.app` bundle is standalone. Copy it with Finder to `/Applications` and launch by double-click. Do not copy only its executable. No installation is performed automatically. Quit older prototypes before switching versions; their in-memory sessions are not transferred. No Terminal is needed for daily use.
+The entire bundle for the chosen architecture is standalone. Copy it with Finder to `/Applications` and launch by double-click. Do not copy only its executable. No installation is performed automatically. Quit older prototypes before switching versions; their in-memory sessions are not transferred. No Terminal is needed for daily use.
 
 This release is not notarized and is not Developer ID signed. A downloaded copy may require Apple's supported **Open Anyway** flow after you verify its provenance. Do not disable Gatekeeper globally. See [Apple's opening guidance](https://support.apple.com/en-gb/102445).
 
@@ -40,7 +40,7 @@ For a reproducible synthetic demonstration (no user media):
 
 ```sh
 swift Scripts/prepare-demo.swift
-open -n dist/VideoLoggerFCP.app --args -AppleLanguages '(en)' --open "$PWD/.local/README-demo"
+open -n dist/Apple-Silicon/VideoLoggerFCP.app --args -AppleLanguages '(en)' --open "$PWD/.local/README-demo"
 ```
 
 The generator refuses to overwrite an existing demo folder. Generated movies/LLC remain ignored in .local/. The launch override is for testing/capture and does not persist a system setting.
